@@ -1153,12 +1153,9 @@ elif page == "◉  ANALYTICS":
         )
         top_areas.index += 1
         top_areas.columns = ["DISTRICT", "AREA", "EVENTS", "PERSONS"]
-        st.dataframe(
-            top_areas.style
-                .background_gradient(subset=["PERSONS"], cmap="Blues")
-                .format({"PERSONS": "{:,}", "EVENTS": "{:,}"}),
-            use_container_width=True, height=340,
-        )
+        top_areas["PERSONS"] = top_areas["PERSONS"].apply(lambda x: f"{x:,}")
+        top_areas["EVENTS"]  = top_areas["EVENTS"].apply(lambda x: f"{x:,}")
+        st.dataframe(top_areas, use_container_width=True, height=340)
 
     # ── ROW 4: Season  +  Weekend/Weekday ────────────────────────────────────
     col_g, col_h = st.columns(2)
