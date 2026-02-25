@@ -913,7 +913,7 @@ elif page == "◈  PREDICTIONS":
         _fc_cnt = _fc_lookup.get(_dkey, 0)
         _preds  = sorted(_by_date.get(_tgt, []), key=lambda p: -p.get("confidence", 0))
         _alert  = "!! ELEVATED" if _fc_cnt >= 10 else "MODERATE" if _fc_cnt >= 5 else "NOMINAL"
-        _label  = f"{_dname}   ·   {_dfmt}   ·   ~{_fc_cnt:.1f} arrests   ·   {_alert}"
+        _label  = f"{_dname}  |  {_dfmt}  |  ~{_fc_cnt:.1f} arrests  |  {_alert}"
 
         with st.expander(_label, expanded=(_fc_cnt >= 10)):
             if not _preds:
