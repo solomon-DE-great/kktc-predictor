@@ -875,6 +875,127 @@ elif page == "◈  PREDICTIONS":
 
     st.divider()
 
+    # ── 7-DAY OPERATIONAL BREAKDOWN ───────────────────────────────────────────
+    st.subheader("7-DAY OPERATIONAL BREAKDOWN")
+    st.caption("Each day shows predicted arrest locations, time windows, coordinates and confidence. Click a day to expand.")
+
+    _today = date.today()
+
+    # forecast volume lookup: "YYYY-MM-DD" → predicted_count
+    _fc_lookup = {
+        d.get("date", ""): d.get("predicted_count", d.get("yhat", 0))
+        for d in daily_forecast[:7]
+    }
+
+    # group predictions by target date (only upcoming 7 days)
+    _by_date: dict = {}
+    for _p in predictions:
+        _raw = _p.get("predicted_date") or _p.get("target_date", "")
+        try:
+            _pd = datetime.strptime(_raw[:10], "%Y-%m-%d").date()
+            if _today <= _pd <= _today + timedelta(days=7):
+                _by_date.setdefault(_pd, []).append(_p)
+        except Exception:
+            pass
+
+    # sorted forecast dates
+    _fc_dates = []
+    for _d in daily_forecast[:7]:
+        try:
+            _fc_dates.append(datetime.strptime(_d["date"], "%Y-%m-%d").date())
+        except Exception:
+            pass
+
+    for _tgt in sorted(_fc_dates):
+        _dname  = _tgt.strftime("%A").upper()
+        _dfmt   = _tgt.strftime("%d %B %Y")
+        _dkey   = _tgt.strftime("%Y-%m-%d")
+        _fc_cnt = _fc_lookup.get(_dkey, 0)
+        _preds  = sorted(_by_date.get(_tgt, []), key=lambda p: -p.get("confidence", 0))
+        _alert  = "!! ELEVATED" if _fc_cnt >= 10 else "MODERATE" if _fc_cnt >= 5 else "NOMINAL"
+        _label  = f"{_dname}   ·   {_dfmt}   ·   ~{_fc_cnt:.1f} arrests   ·   {_alert}"
+
+        with st.expander(_label, expanded=(_fc_cnt >= 10)):
+            if not _preds:
+                st.markdown(
+                    f'<div style="font-family:\'Courier New\',monospace;color:#9CA3AF;'
+                    f'font-size:13px;padding:8px 0">'
+                    f'No specific location predictions identified for this day.<br>'
+                    f'Expected volume: <span style="color:#00e5ff">~{_fc_cnt:.1f} arrests</span>'
+                    f' across general patrol areas.</div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                for _i, _p in enumerate(_preds, 1):
+                    _conf   = _p.get("confidence", 0)
+                    _clr    = conf_color(_conf)
+                    _r, _g, _b = hex_to_rgb(_clr)
+                    _dist   = (_p.get("district") or "?").upper()
+                    _area   = (_p.get("specific_area") or "").strip()
+                    _loc    = _dist + (f" / {_area}" if _area else "")
+                    _twk    = _p.get("predicted_time_window", "")
+                    _tw     = TW_LABELS.get(_twk, _twk.upper() if _twk else "?")
+                    _ph     = _p.get("predicted_hour")
+                    _hstr   = f"{int(_ph):02d}:{int((_ph % 1) * 60):02d}" if _ph is not None else "?"
+                    _cnt    = _p.get("predicted_count", "?")
+                    _lat    = _p.get("latitude")
+                    _lon    = _p.get("longitude")
+                    _mdl    = (_p.get("model") or "?").upper()
+                    _hist   = _p.get("historical_events", 0)
+                    _rep    = _p.get("has_temporal_pattern", False)
+                    _intv   = _p.get("pattern_interval_days")
+                    _bw     = int(_conf * 100)
+                    _clabel = conf_label(_conf)
+                    _coords = f"{_lat:.4f}&#176;N &nbsp; {_lon:.4f}&#176;E" if _lat and _lon else "No coordinates"
+                    _rep_html = (
+                        f'<div style="color:#cc44ff;margin-top:6px;font-size:12px">'
+                        f'&#9888; REPEAT CYCLE DETECTED &mdash; every ~{_intv:.1f} days</div>'
+                        if _rep and _intv else ""
+                    )
+                    st.markdown(
+                        f'<div style="background:#1A1F2E;border:1px solid {_clr};'
+                        f'border-left:4px solid {_clr};padding:12px 16px;margin-bottom:8px;'
+                        f'font-family:\'Courier New\',monospace">'
+                        f'<div style="display:flex;justify-content:space-between;'
+                        f'align-items:center;flex-wrap:wrap;gap:6px">'
+                        f'<span style="color:#F0F0F0;font-size:14px;font-weight:bold">'
+                        f'#{_i} &nbsp; {_loc}</span>'
+                        f'<span style="color:{_clr};border:1px solid {_clr};'
+                        f'padding:2px 10px;font-size:11px;text-shadow:0 0 6px {_clr}">'
+                        f'{_conf:.0%} &#9670; {_clabel}</span>'
+                        f'</div>'
+                        f'<div style="border-top:1px solid #2D3748;margin:8px 0 6px"></div>'
+                        f'<div style="display:grid;grid-template-columns:repeat(3,1fr);'
+                        f'gap:12px;font-size:13px">'
+                        f'<div><span style="color:#9CA3AF;font-size:11px">TIME WINDOW</span>'
+                        f'<br><span style="color:#F0F0F0">{_tw}</span></div>'
+                        f'<div><span style="color:#9CA3AF;font-size:11px">PEAK HOUR</span>'
+                        f'<br><span style="color:{_clr};font-size:16px;font-weight:bold">'
+                        f'~{_hstr}</span></div>'
+                        f'<div><span style="color:#9CA3AF;font-size:11px">EST. COUNT</span>'
+                        f'<br><span style="color:#F0F0F0">~{_cnt} person(s)</span></div>'
+                        f'<div><span style="color:#9CA3AF;font-size:11px">COORDINATES</span>'
+                        f'<br><span style="color:#F0F0F0">{_coords}</span></div>'
+                        f'<div><span style="color:#9CA3AF;font-size:11px">PRIOR ARRESTS</span>'
+                        f'<br><span style="color:#F0F0F0">{_hist} at this location</span></div>'
+                        f'<div><span style="color:#9CA3AF;font-size:11px">MODEL</span>'
+                        f'<br><span style="color:#F0F0F0">{_mdl}</span></div>'
+                        f'</div>'
+                        f'<div style="margin-top:8px;display:flex;align-items:center;gap:10px">'
+                        f'<div style="flex:1;background:#2D3748;height:6px;border-radius:2px">'
+                        f'<div style="background:{_clr};height:6px;width:{_bw}%;'
+                        f'border-radius:2px;box-shadow:0 0 4px {_clr}"></div>'
+                        f'</div>'
+                        f'<span style="color:#F0F0F0;font-size:12px;white-space:nowrap">'
+                        f'{_bw}%</span>'
+                        f'</div>'
+                        f'{_rep_html}'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+
+    st.divider()
+
     # ── REPEAT PATTERNS ───────────────────────────────────────────────────────
     if repeat_pats:
         st.subheader("REPEAT RAID PATTERNS DETECTED")
